@@ -15,6 +15,7 @@ import traceback
 from .slackclient import SlackClient
 from .server import LimboServer
 from .fakeserver import FakeServer
+import telegram
 
 CURDIR = os.path.abspath(os.path.dirname(__file__))
 DIR = functools.partial(os.path.join, CURDIR)
@@ -91,7 +92,8 @@ def run_hook(hooks, hook, *args):
 def handle_message(event, server):
     # ignore bot messages and edits
     subtype = event.get("subtype", "")
-    if subtype == "bot_message" or subtype == "message_changed":
+    user = event.get("user", "")
+    if subtype == "bot_message" or subtype == "message_changed" or user == "":
         return
 
     botname = server.slack.server.login_data["self"]["name"]
@@ -127,10 +129,18 @@ def init_config():
     getif(config, "loglevel", "LIMBO_LOGLEVEL")
     getif(config, "logfile", "LIMBO_LOGFILE")
     getif(config, "logformat", "LIMBO_LOGFORMAT")
+    getif(config, "tg_token", "TG_TOKEN")
+    getif(config, "tg_reg_token", "TG_REG_TOKEN")
     return config
 
 def loop(server):
     try:
+        last_update_id = None
+        try:
+            last_update_id = server.tg_bot.getUpdates()[-1].update_id
+        except IndexError:
+            last_update_id = None
+        
         while True:
             # This will cause a broken pipe to reveal itself
             server.slack.server.ping()
@@ -141,7 +151,29 @@ def loop(server):
                 response = handle_event(event, server)
                 if response:
                     server.slack.rtm_send_message(event["channel"], response)
+            
+            # handle tg bot
+            for update in server.tg_bot.getUpdates(offset=last_update_id):
+                if last_update_id < update.update_id:
+                    # chat_id is required to reply any message
+                    chat_id = update.message.chat_id
+                    message = update.message.text.encode('utf-8')
+                    
+                    match = re.findall(r"!linkdown(.*)", message)
+                    if match:
+                        server.query("DELETE FROM tg_id WHERE chat_id=?",chat_id)
+                        server.tg_bot.sendMessage(chat_id=chat_id,
+                            text="Good bye!")
+                    else:
+                        match = re.findall(r"!linkup (\S*)", message)
+                        if match and match[0] == server.config["tg_reg_token"]:
+                            server.query("INSERT INTO tg_id VALUES (?)",chat_id)
+                            server.tg_bot.sendMessage(chat_id=chat_id,
+                                text="Welcome back! I was worried about you,")
 
+                # Updates global offset to get the new updates
+                last_update_id = update.update_id
+            
             time.sleep(1)
     except KeyboardInterrupt:
         if os.environ.get("LIMBO_DEBUG"):
@@ -160,6 +192,7 @@ def init_server(args, config, Server=LimboServer, Client=SlackClient):
     hooks = init_plugins(args.pluginpath)
     try:
         slack = Client(config["token"])
+        tg_bot = telegram.Bot(config["tg_token"])
     except KeyError:
         logger.error("""Unable to find a slack token. The environment variables
 limbo sees are:
@@ -173,7 +206,7 @@ Try setting your bot's slack token with:
 export SLACK_TOKEN=<your-slack-bot-token>
 """.format(relevant_environ(), config))
         raise
-    server = Server(slack, config, hooks, db)
+    server = Server(slack, config, hooks, db, tg_bot)
     return server
 
 # decode a string. if str is a python 3 string, do nothing.

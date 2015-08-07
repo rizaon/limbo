@@ -1,3 +1,7 @@
+export SLACK_TOKEN := token_slack
+export TG_TOKEN := token_tg
+export TG_REG_TOKEN := init_reg
+
 .PHONY: testall
 testall: requirements
 	tox
@@ -12,7 +16,7 @@ clean:
 
 .PHONY: run
 run: install
-	bin/limbo
+	bin/limbo -d dyandra.db
 
 .PHONY: repl
 repl: install
