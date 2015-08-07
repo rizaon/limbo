@@ -131,15 +131,47 @@ def init_config():
     getif(config, "logformat", "LIMBO_LOGFORMAT")
     getif(config, "tg_token", "TG_TOKEN")
     getif(config, "tg_reg_token", "TG_REG_TOKEN")
+    config["tg_last_update_id"] = None
     return config
+    
+def tg_handler(server):
+    try:
+        last_update_id = server.config["tg_last_update_id"]
+        
+        # handle tg bot
+        for update in server.tg_bot.getUpdates(offset=last_update_id):
+            if last_update_id < update.update_id and update.message.text <> None:
+                # chat_id is required to reply any message
+                chat_id = update.message.chat_id
+                message = update.message.text.encode('utf-8')
+                
+                match = re.findall(r"/linkdown (\S*)", message)
+                if match and match[0] == server.config["tg_reg_token"]:
+                    server.query("DELETE FROM tg_id WHERE chat_id=?",chat_id)
+                    server.tg_bot.sendMessage(chat_id=chat_id, text="Good bye!")
+                else:
+                    match = re.findall(r"/linkup (\S*)", message)
+                    if match and match[0] == server.config["tg_reg_token"]:
+                        server.query("INSERT INTO tg_id VALUES (?)",chat_id)
+                        server.tg_bot.sendMessage(chat_id=chat_id,
+                        text="Welcome back! I was worried about you,")
+                
+                # Updates global offset to get the new updates
+            last_update_id = update.update_id
+        
+        server.config["tg_last_update_id"] = last_update_id
+        
+    except KeyboardInterrupt:
+        if os.environ.get("LIMBO_DEBUG"):
+            import ipdb; ipdb.set_trace()
+        raise
 
 def loop(server):
     try:
-        last_update_id = 0
         try:
-            last_update_id = server.tg_bot.getUpdates()[-1].update_id
+            server.config["tg_last_update_id"] = server.tg_bot.getUpdates()[-1].update_id
         except IndexError:
-            last_update_id = None
+            server.config["tg_last_update_id"] = None
         
         while True:
             # This will cause a broken pipe to reveal itself
@@ -152,27 +184,7 @@ def loop(server):
                 if response:
                     server.slack.rtm_send_message(event["channel"], response)
             
-            # handle tg bot
-            for update in server.tg_bot.getUpdates(offset=last_update_id):
-                if last_update_id < update.update_id and update.message.text <> None:
-                    # chat_id is required to reply any message
-                    chat_id = update.message.chat_id
-                    message = update.message.text.encode('utf-8')
-                    
-                    match = re.findall(r"/linkdown(.*)", message)
-                    if match:
-                        server.query("DELETE FROM tg_id WHERE chat_id=?",chat_id)
-                        server.tg_bot.sendMessage(chat_id=chat_id,
-                            text="Good bye!")
-                    else:
-                        match = re.findall(r"/linkup (\S*)", message)
-                        if match and match[0] == server.config["tg_reg_token"]:
-                            server.query("INSERT INTO tg_id VALUES (?)",chat_id)
-                            server.tg_bot.sendMessage(chat_id=chat_id,
-                                text="Welcome back! I was worried about you,")
-
-                # Updates global offset to get the new updates
-                last_update_id = update.update_id
+            tg_handler(server)
             
             time.sleep(1)
     except KeyboardInterrupt:
