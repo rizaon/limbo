@@ -135,7 +135,7 @@ def init_config():
 
 def loop(server):
     try:
-        last_update_id = None
+        last_update_id = 0
         try:
             last_update_id = server.tg_bot.getUpdates()[-1].update_id
         except IndexError:
@@ -154,18 +154,18 @@ def loop(server):
             
             # handle tg bot
             for update in server.tg_bot.getUpdates(offset=last_update_id):
-                if last_update_id < update.update_id:
+                if last_update_id < update.update_id and update.message.text <> None:
                     # chat_id is required to reply any message
                     chat_id = update.message.chat_id
                     message = update.message.text.encode('utf-8')
                     
-                    match = re.findall(r"!linkdown(.*)", message)
+                    match = re.findall(r"/linkdown(.*)", message)
                     if match:
                         server.query("DELETE FROM tg_id WHERE chat_id=?",chat_id)
                         server.tg_bot.sendMessage(chat_id=chat_id,
                             text="Good bye!")
                     else:
-                        match = re.findall(r"!linkup (\S*)", message)
+                        match = re.findall(r"/linkup (\S*)", message)
                         if match and match[0] == server.config["tg_reg_token"]:
                             server.query("INSERT INTO tg_id VALUES (?)",chat_id)
                             server.tg_bot.sendMessage(chat_id=chat_id,
