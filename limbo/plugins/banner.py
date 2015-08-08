@@ -33,7 +33,7 @@ def make_banner(query):
 
 def on_message(msg, server):
     text = msg.get("text", "")
-    match = re.findall(r"!banner (.*)", text)
+    match = re.findall(r"^!banner (.*)", text)
     if not match:
         return
 

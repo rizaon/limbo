@@ -22,7 +22,7 @@ def youtube(searchterm):
 
 def on_message(msg, server):
     text = msg.get("text", "")
-    match = re.findall(r"!youtube (.*)", text)
+    match = re.findall(r"^!youtube (.*)", text)
     if not match:
         return
 

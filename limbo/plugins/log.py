@@ -1,4 +1,5 @@
-"""Log all messages to the database
+"""
+Log all messages to the database
 
 Only active if the LIMBO_LOG_EVERYTHING environment variable is set"""
 import os

@@ -1,4 +1,5 @@
-"""!genesis returns a random sega genesis screenshot"""
+"""
+!genesis returns a random sega genesis screenshot"""
 
 from bs4 import BeautifulSoup
 import re

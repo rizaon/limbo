@@ -24,7 +24,7 @@ def calc(eq):
 
 def on_message(msg, server):
     text = msg.get("text", "")
-    match = re.findall(r"!calc (.*)", text)
+    match = re.findall(r"^!calc (.*)", text)
     if not match:
         return
 

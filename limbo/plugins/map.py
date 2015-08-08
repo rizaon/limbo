@@ -40,7 +40,7 @@ def makemap(query):
 
 def on_message(msg, server):
     text = msg.get("text", "")
-    match = re.findall(r"!map (.*)", text)
+    match = re.findall(r"^!map (.*)", text)
     if not match:
         return
 

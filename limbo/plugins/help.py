@@ -4,12 +4,14 @@ import re
 
 def on_message(msg, server):
     text = msg.get("text", "")
-    match = re.findall(r"!help( .*)?", text)
+    match = re.findall(r"^!help( .*)?", text)
     if not match:
         return
 
     helptopic = match[0].strip()
     if helptopic:
         return server.hooks["help"].get(helptopic, "No help found for {0}".format(helptopic))
-    else:
+    elif text=="!help":
         return "\n".join(sorted(val for _, val in server.hooks["help"].iteritems()))
+    else:
+        return

@@ -17,7 +17,7 @@ def emoji(n=1):
 
 def on_message(msg, server):
     text = msg.get("text", "")
-    match = re.findall(r"(!emoji)\s*(\d+)*", text)
+    match = re.findall(r"^(!emoji)(\s+\d+)?", text)
     if not match:
         return
 

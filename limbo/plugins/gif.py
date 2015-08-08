@@ -1,4 +1,5 @@
-"""!gif <search term> return a random result from the  google gif search result for <search term>"""
+"""
+!gif <search term> return a random result from the  google gif search result for <search term>"""
 
 try:
     from urllib import quote, unquote
@@ -29,7 +30,7 @@ def gif(searchterm, unsafe=False):
 
 def on_message(msg, server):
     text = msg.get("text", "")
-    match = re.findall(r"!gif (.*)", text)
+    match = re.findall(r"^!gif (.*)", text)
     if not match:
         return
 

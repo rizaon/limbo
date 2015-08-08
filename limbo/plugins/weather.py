@@ -40,7 +40,7 @@ def weather(searchterm):
 
 def on_message(msg, server):
     text = msg.get("text", "")
-    match = re.findall(r"!weather (.*)", text)
+    match = re.findall(r"^!weather (.*)", text)
     if not match:
         return
 

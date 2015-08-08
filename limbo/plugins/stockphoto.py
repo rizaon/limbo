@@ -22,7 +22,7 @@ def stock(searchterm):
 
 def on_message(msg, server):
     text = msg.get("text", "")
-    match = re.findall(r"!stock (.*)", text)
+    match = re.findall(r"^!stock (.*)", text)
     if not match:
         return
 
