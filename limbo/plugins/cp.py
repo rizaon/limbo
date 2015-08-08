@@ -92,7 +92,7 @@ def cp(zone="Asia/Jakarta"):
 
 def on_message(msg, server):
     text = msg.get("text", "")
-    match = re.findall(r"!cp(.*)", text)
+    match = "!cp" == text
     if not match:
         return
 

@@ -15,7 +15,10 @@ import traceback
 from .slackclient import SlackClient
 from .server import LimboServer
 from .fakeserver import FakeServer
+
+from telegram import TelegramError
 import telegram
+
 
 CURDIR = os.path.abspath(os.path.dirname(__file__))
 DIR = functools.partial(os.path.join, CURDIR)
@@ -145,12 +148,12 @@ def tg_handler(server):
                 chat_id = update.message.chat_id
                 message = update.message.text.encode('utf-8')
                 
-                match = re.findall(r"/linkdown (\S*)", message)
+                match = re.findall(r"^/linkdown (\S*)", message)
                 if match and match[0] == server.config["tg_reg_token"]:
                     server.query("DELETE FROM tg_id WHERE chat_id=?",chat_id)
                     server.tg_bot.sendMessage(chat_id=chat_id, text="Good bye!")
                 else:
-                    match = re.findall(r"/linkup (\S*)", message)
+                    match = re.findall(r"^/linkup (\S*)", message)
                     if match and match[0] == server.config["tg_reg_token"]:
                         server.query("INSERT INTO tg_id VALUES (?)",chat_id)
                         server.tg_bot.sendMessage(chat_id=chat_id,
@@ -160,7 +163,9 @@ def tg_handler(server):
             last_update_id = update.update_id
         
         server.config["tg_last_update_id"] = last_update_id
-        
+    except TelegramError:
+	# reinit tg_bot
+        server.tg_bot = telegram.Bot(server.config["tg_token"])
     except KeyboardInterrupt:
         if os.environ.get("LIMBO_DEBUG"):
             import ipdb; ipdb.set_trace()
@@ -219,6 +224,11 @@ export SLACK_TOKEN=<your-slack-bot-token>
 """.format(relevant_environ(), config))
         raise
     server = Server(slack, config, hooks, db, tg_bot)
+
+    # init db if not exist
+    server.query("""
+CREATE TABLE IF NOT EXISTS tg_id (chat_id INT)
+""")
     return server
 
 # decode a string. if str is a python 3 string, do nothing.
