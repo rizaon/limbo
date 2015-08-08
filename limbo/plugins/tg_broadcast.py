@@ -7,7 +7,7 @@ def on_message(msg, server):
         return
     
     channel = server.slack.server.channels.find(cid)
-    if (channel.name != "idnres-pengumuman") && (channel.name != "passcode"):
+    if (channel.name != "idnres-pengumuman") and (channel.name != "passcode"):
         return
     
     text = msg.get("text", "")
