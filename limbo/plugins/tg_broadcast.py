@@ -3,7 +3,10 @@ import re
 
 def on_message(msg, server):
     cid = msg.get("channel", "")
-    if cid == "":
+    subtype = msg.get("subtype", "")
+    
+    # do not broadcast special message
+    if (cid == "") or (subtype != ""):
         return
     
     channel = server.slack.server.channels.find(cid)
