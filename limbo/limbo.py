@@ -16,9 +16,6 @@ from .slackclient import SlackClient
 from .server import LimboServer
 from .fakeserver import FakeServer
 
-from telegram import TelegramError
-import telegram
-
 
 CURDIR = os.path.abspath(os.path.dirname(__file__))
 DIR = functools.partial(os.path.join, CURDIR)
@@ -139,6 +136,7 @@ def init_config():
     
 def tg_handler(server):
     try:
+        import telegram
         last_update_id = server.config["tg_last_update_id"]
         
         # handle tg bot
@@ -163,7 +161,7 @@ def tg_handler(server):
             last_update_id = update.update_id
         
         server.config["tg_last_update_id"] = last_update_id
-    except TelegramError:
+    except telegram.TelegramError:
 	# reinit tg_bot
         server.tg_bot = telegram.Bot(server.config["tg_token"])
     except KeyboardInterrupt:
@@ -208,6 +206,7 @@ def init_server(args, config, Server=LimboServer, Client=SlackClient):
     db = init_db(args.database_name)
     hooks = init_plugins(args.pluginpath)
     try:
+        import telegram
         slack = Client(config["token"])
         tg_bot = telegram.Bot(config["tg_token"])
     except KeyError:
