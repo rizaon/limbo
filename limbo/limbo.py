@@ -148,11 +148,13 @@ def tg_handler(server):
                 
                 match = re.findall(r"^/linkdown (\S*)", message)
                 if match and match[0] == server.config["tg_reg_token"]:
+                    logger.debug("delete %d from id_list" % chat_id)
                     server.query("DELETE FROM tg_id WHERE chat_id=?",chat_id)
                     server.tg_bot.sendMessage(chat_id=chat_id, text="Good bye!")
                 else:
                     match = re.findall(r"^/linkup (\S*)", message)
                     if match and match[0] == server.config["tg_reg_token"]:
+                        logger.debug("insert %d into id_list" % chat_id)
                         server.query("INSERT INTO tg_id VALUES (?)",chat_id)
                         server.tg_bot.sendMessage(chat_id=chat_id,
                         text="Welcome back! I was worried about you,")
@@ -189,7 +191,7 @@ def loop(server):
             
             tg_handler(server)
             
-            time.sleep(1)
+            time.sleep(2)
     except KeyboardInterrupt:
         if os.environ.get("LIMBO_DEBUG"):
             import ipdb; ipdb.set_trace()

@@ -20,6 +20,7 @@ def on_message(msg, server):
     
     for row in server.query("SELECT chat_id FROM tg_id"):
         chat_id = row[0]
-        server.tg_bot.sendMessage(chat_id=chat_id, text=text)
+        chat_text = match[0].encode('utf-8')
+        server.tg_bot.sendMessage(chat_id=chat_id, text=chat_text)
     
     return

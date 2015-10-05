@@ -28,10 +28,31 @@ def on_message(msg, server):
     match = re.findall(r"^!tg_broadcast (.*)", text)
     if match:
         rows = server.query("SELECT chat_id FROM tg_id")
+        failed = []
         for row in rows:
-            chat_id = row[0]
-            server.tg_bot.sendMessage(chat_id=chat_id, text=match[0])
-        return "Message broadcasted to %d chats: %s" % (len(rows), match[0])
+            try:
+                chat_id = row[0]
+                chat_text = match[0].encode('utf-8')
+                server.tg_bot.sendMessage(chat_id=chat_id, text=chat_text)
+            except Exception as e
+                failed.append("%s: %s" (str(row[0]),str(e)))
+        retval = "Message broadcasted to %d chats: %s" % (len(rows), match[0])
+        if len(failed) > 0:
+            retval += "\n Following id are unable to contact: " + ",".join(failed) 
+        return retval
+
+    # individual message broadcast
+    match = re.findall(r"^!tg_send (-?[0-9]+) (.*)", text)
+    if match:
+        retval = ""
+        try:
+            chat_id = int(match[0][0])
+            chat_text = match[0][1].encode('utf-8')
+            server.tg_bot.sendMessage(chat_id=chat_id, text=chat_text)
+            retval = "Message broadcasted to %s chat: %s" % match[0]
+        except Exception as e:
+            retval = "Unable to to send to " + match[0][0] + "\n" + str(e)
+        return retval
     
     # list stored chat_id
     match = "!tg_id_list" == text
