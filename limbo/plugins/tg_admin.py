@@ -34,7 +34,7 @@ def on_message(msg, server):
                 chat_id = row[0]
                 chat_text = match[0].encode('utf-8')
                 server.tg_bot.sendMessage(chat_id=chat_id, text=chat_text)
-            except Exception as e
+            except Exception as e:
                 failed.append("%s: %s" (str(row[0]),str(e)))
         retval = "Message broadcasted to %d chats: %s" % (len(rows), match[0])
         if len(failed) > 0:
