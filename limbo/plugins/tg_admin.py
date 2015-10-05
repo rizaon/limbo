@@ -6,7 +6,7 @@ def on_message(msg, server):
     if cid == "":
         return
     
-    channel = server.slack.server.channels.find(cid)
+    channel = server.slack.server.channels[cid]
     if not (channel.name == "admin-bot"):
         return
     

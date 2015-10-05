@@ -12,7 +12,7 @@ def on_message(msg, server):
     if (cid == "") or (subtype != ""):
         return
     
-    channel = server.slack.server.channels.find(cid)
+    channel = server.slack.server.channels[cid]
     if (channel.name != "idnres-pengumuman") and (channel.name != "passcode"):
         return
     

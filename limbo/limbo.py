@@ -12,7 +12,8 @@ import sys
 import time
 import traceback
 
-from .slackclient import SlackClient
+from slackrtm import SlackClient
+from slackrtm.server import SlackConnectionError, SlackLoginError
 from .server import LimboServer
 from .fakeserver import FakeServer
 
@@ -26,7 +27,8 @@ logger = logging.getLogger(__name__)
 
 class InvalidPluginDir(Exception):
     def __init__(self, plugindir):
-        self.message = "Unable to find plugin dir {0}".format(plugindir)
+        message = "Unable to find plugin dir {0}".format(plugindir)
+        super(InvalidPluginDir, self).__init__(message)
 
 def init_log(config):
     loglevel = config.get("loglevel", logging.INFO)
@@ -36,24 +38,40 @@ def init_log(config):
     else:
         logging.basicConfig(format=logformat, level=loglevel)
 
+def strip_extension(lst):
+    return (os.path.splitext(l)[0] for l in lst)
+
 def init_plugins(plugindir):
+    if plugindir and not os.path.isdir(plugindir):
+        raise InvalidPluginDir(plugindir)
+
     if not plugindir:
         plugindir = DIR("plugins")
 
     logger.debug("plugindir: {0}".format(plugindir))
 
-    if not os.path.isdir(plugindir):
-        raise InvalidPluginDir(plugindir)
+    if os.path.isdir(plugindir):
+        pluginfiles = glob(os.path.join(plugindir, "[!_]*.py"))
+        plugins = strip_extension(os.path.basename(p) for p in pluginfiles)
+    else:
+        # we might be in an egg; try to get the files that way
+        logger.debug("trying pkg_resources")
+        import pkg_resources
+        try:
+            plugins = strip_extension(
+                    pkg_resources.resource_listdir(__name__, "plugins"))
+        except OSError:
+            raise InvalidPluginDir(plugindir)
 
     hooks = {}
 
     oldpath = copy.deepcopy(sys.path)
     sys.path.insert(0, plugindir)
 
-    for plugin in glob(os.path.join(plugindir, "[!_]*.py")):
+    for plugin in plugins:
         logger.debug("plugin: {0}".format(plugin))
         try:
-            mod = importlib.import_module(os.path.basename(plugin)[:-3])
+            mod = importlib.import_module(plugin)
             modname = mod.__name__
             for hook in re.findall("on_(\w+)", " ".join(dir(mod))):
                 hookfun = getattr(mod, "on_" + hook)
@@ -89,23 +107,27 @@ def run_hook(hooks, hook, *args):
 
     return responses
 
+def handle_bot_message(event, server):
+    try:
+        bot = server.slack.server.bots[event["bot_id"]]
+    except KeyError:
+        logger.debug("bot_message event {0} has no bot".format(event))
+        return
+
+    return "\n".join(run_hook(server.hooks, "bot_message", event, server))
+
 def handle_message(event, server):
-    # ignore bot messages and edits
     subtype = event.get("subtype", "")
-    user = event.get("user", "")
-    if subtype == "bot_message" or subtype == "message_changed" or user == "":
+    if subtype == "message_changed":
         return
 
-    botname = server.slack.server.login_data["self"]["name"]
-    msguser = server.slack.server.users.find(event["user"])
+    if subtype == "bot_message":
+        return handle_bot_message(event, server)
 
-    # slack returns None if it can't find the user because it thinks it's ruby
-    if not msguser:
+    try:
+        msguser = server.slack.server.users[event["user"]]
+    except KeyError:
         logger.debug("event {0} has no user".format(event))
-        return
-
-    # don't respond to ourself or slackbot
-    if msguser.name == botname or msguser.name.lower() == "slackbot":
         return
 
     return "\n".join(run_hook(server.hooks, "message", event, server))
@@ -179,6 +201,8 @@ def loop(server):
             server.config["tg_last_update_id"] = None
         
         while True:
+            start = time.time()
+
             # This will cause a broken pipe to reveal itself
             server.slack.server.ping()
 
@@ -190,8 +214,10 @@ def loop(server):
                     server.slack.rtm_send_message(event["channel"], response)
             
             tg_handler(server)
-            
-            time.sleep(2)
+
+            end = time.time()
+            runtime = start - end
+            time.sleep(max(1-runtime, 0))
     except KeyboardInterrupt:
         if os.environ.get("LIMBO_DEBUG"):
             import ipdb; ipdb.set_trace()
@@ -259,19 +285,24 @@ def main(args):
 
     server = init_server(args, config)
 
-    if server.slack.rtm_connect():
+    try:
+        server.slack.rtm_connect()
         # run init hook. This hook doesn't send messages to the server (ought it?)
         run_hook(server.hooks, "init", server)
 
         loop(server)
-    else:
-        logger.warn("Connection Failed, invalid token <{0}>?".format(config["token"]))
+    except SlackConnectionError:
+        logger.warn("Unable to connect to Slack. Bad network?")
+        raise
+    except SlackLoginError:
+        logger.warn("Login Failed, invalid token <{0}>?".format(config["token"]))
+        raise
 
 # run a command. cmd should be a unicode string (str in python3, unicode in python2).
 # returns a string appropriate for printing (str in py2 and py3)
 def run_cmd(cmd, server, hook, pluginpath):
     server.hooks = init_plugins(pluginpath)
-    event = {'type': hook, 'text': cmd, "user": "msguser", 'ts': time.time(), 'team': None, 'channel': None}
+    event = {'type': hook, 'text': cmd, "user": "2", 'ts': time.time(), 'team': None, 'channel': 'repl_channel'}
     return encode(handle_event(event, server))
 
 # raw_input in 2.6 is input in python 3. Set `input` to the correct function
